@@ -1,0 +1,64 @@
+{
+  "name": "@glaciereq/hyperdoc-ai-powerhouse",
+  "version": "1.0.0-alpha.1",
+  "description": "Revolutionary ONLYOFFICE-Powered Document Intelligence - Built on GlacierEQ AI Foundation",
+  "private": false,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "docker-compose -f docker-compose.dev.yml up -d",
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "build": "pnpm run -r build",
+    "test": "pnpm run -r test",
+    "lint": "pnpm run -r lint",
+    "init-foundation": "./ops/scripts/init-glaciereq-foundation.sh",
+    "setup-dev": "./ops/scripts/setup-dev.sh",
+    "deploy-k8s": "kubectl apply -f infra/k8s/",
+    "monitor": "open http://localhost:3001",
+    "docs": "pnpm run docs:build && pnpm run docs:serve",
+    "docs:build": "typedoc --out docs/api src",
+    "docs:serve": "serve docs/api -p 8080",
+    "security:scan": "npm audit && pnpm audit",
+    "performance:test": "./ops/scripts/performance-test.sh",
+    "submodules:init": "git submodule update --init --recursive",
+    "submodules:update": "git submodule update --remote --recursive"
+  },
+  "keywords": [
+    "ai",
+    "document-automation", 
+    "onlyoffice",
+    "latex",
+    "collaboration",
+    "memory-federation",
+    "multi-agent",
+    "glaciereq",
+    "legal-ai",
+    "evidence-processing"
+  ],
+  "author": "GlacierEQ <GLACIER.EQUILIBRIUM@GMAIL.COM>",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GlacierEQ/hyperdoc-ai-powerhouse.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GlacierEQ/hyperdoc-ai-powerhouse/issues"
+  },
+  "homepage": "https://github.com/GlacierEQ/hyperdoc-ai-powerhouse#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.0",
+    "typedoc": "^0.25.0",
+    "serve": "^14.2.0"
+  }
+}
