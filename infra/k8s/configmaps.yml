@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hyperdoc-ai-config
+  namespace: hyperdoc-ai
+data:
+  # AI Provider Configuration
+  ai-providers.yml: |
+    providers:
+      openai:
+        models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
+        priority: 95
+        rate_limit: 10000
+        cost_per_token: 0.01
+      deepseek:
+        models: ["deepseek-chat", "deepseek-coder"]
+        priority: 90
+        rate_limit: 5000
+        cost_per_token: 0.002
+      anthropic:
+        models: ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+        priority: 92
+        rate_limit: 8000
+        cost_per_token: 0.008
+      gemini:
+        models: ["gemini-1.5-pro", "gemini-1.5-flash"]
+        priority: 88
+        rate_limit: 6000
+        cost_per_token: 0.005
+  
+  # Memory Configuration
+  memory-config.yml: |
+    federation:
+      primary_provider: "supermemory"
+      replication_enabled: true
+      vector_dimensions: 1536
+      cache_ttl: 3600
+    providers:
+      supermemory:
+        type: "primary"
+        mcp_integration: true
+      mem0:
+        type: "persistent"
+        org_based: true
+      memoryos:
+        type: "system"
+        local_storage: true
+  
+  # Performance Configuration
+  performance-config.yml: |
+    orchestrator:
+      max_concurrent_requests: 1000
+      request_timeout: 30000
+      retry_attempts: 3
+      circuit_breaker_threshold: 10
+      health_check_interval: 30000
+    memory:
+      cache_size: 1000
+      vector_cache_ttl: 7200
+      search_timeout: 5000
+    mcp:
+      tool_timeout: 10000
+      batch_size: 10
+      retry_count: 3
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: hyperdoc-ai
+data:
+  nginx.conf: |
+    upstream orchestrator-api {
+        server orchestrator-api:8000;
+    }
+    
+    upstream onlyoffice {
+        server onlyoffice-documentserver:80;
+    }
+    
+    upstream docspace {
+        server docspace-ai:5001;
+    }
+    
+    server {
+        listen 80;
+        server_name _;
+        
+        # AI Orchestrator API
+        location /api/ {
+            proxy_pass http://orchestrator-api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+        
+        # ONLYOFFICE DocumentServer
+        location /onlyoffice/ {
+            proxy_pass http://onlyoffice/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+        
+        # DocSpace
+        location /docspace/ {
+            proxy_pass http://docspace/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+        
+        # Health check
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }

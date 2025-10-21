@@ -1,0 +1,245 @@
+# HyperDoc AI Powerhouse - Production Stack
+# Built on GlacierEQ AI Foundation with 500+ Repository Integration
+
+version: '3.8'
+
+services:
+  # AI Orchestrator - Core Intelligence Engine
+  orchestrator-api:
+    build:
+      context: ./apps/orchestrator-api
+      dockerfile: Dockerfile
+    environment:
+      # GlacierEQ AI Provider Arsenal
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_ADMIN_KEY=${OPENAI_ADMIN_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - TOGETHER_AI_API_KEY=${TOGETHER_AI_API_KEY}
+      - COHERE_API_KEY=${COHERE_API_KEY}
+      # Memory Systems
+      - SUPERMEMORY_KEY=${SUPERMEMORY_KEY}
+      - MEM0_API_KEY=${MEM0_API_KEY}
+      - MEM0_ORG_ID=${MEM0_ORG_ID}
+      - MEM0_ORG_NAME=${MEM0_ORG_NAME}
+      # MCP Integration
+      - NOTION_API_KEY=${NOTION_API_KEY}
+      - NOTION_WORKSPACE_ID=${NOTION_WORKSPACE_ID}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      # Database
+      - POSTGRES_URL=postgresql://hyperdoc_user:${POSTGRES_PASSWORD}@postgres:5432/hyperdoc_ai
+      - REDIS_URL=redis://redis:6379
+      # Observability
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - AGENTOPS_API_KEY=${AGENTOPS_API_KEY}
+      # Local AI Integration
+      - ANYTHING_LLM_URL=http://anything-llm:3001/api
+      - ANYTHING_LLM_KEY=${ANYTHING_LLM_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - postgres
+      - anything-llm
+    networks:
+      - hyperdoc-network
+    deploy:
+      replicas: 3
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ONLYOFFICE DocumentServer with HyperDoc AI Integration
+  onlyoffice-documentserver:
+    image: onlyoffice/documentserver-ee:latest
+    environment:
+      - JWT_ENABLED=true
+      - JWT_SECRET=${JWT_SECRET}
+      - WOPI_ENABLED=true
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=onlyoffice
+      - DB_USER=hyperdoc_user
+      - DB_PWD=${POSTGRES_PASSWORD}
+      - REDIS_SERVER_HOST=redis
+      - REDIS_SERVER_PORT=6379
+    volumes:
+      - ./plugins/hyperdoc-plugins:/var/www/onlyoffice/documentserver/sdkjs-plugins/
+      - ./submodules/onlyoffice:/var/www/onlyoffice/submodules/
+      - document-data:/var/www/onlyoffice/Data
+      - document-logs:/var/log/onlyoffice
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - hyperdoc-network
+
+  # ONLYOFFICE DocSpace with AI Hub
+  docspace-ai:
+    image: onlyoffice/docspace:latest
+    environment:
+      - DOCUMENT_SERVER_URL=http://onlyoffice-documentserver
+      - AI_ENGINE_URL=http://orchestrator-api:8000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=docspace
+      - POSTGRES_USER=hyperdoc_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+    volumes:
+      - ./plugins/docspace-plugins:/var/www/onlyoffice/docspace/plugins/
+      - docspace-data:/var/www/onlyoffice/Data
+    ports:
+      - "5001:5001"
+    depends_on:
+      - postgres
+      - redis
+      - orchestrator-api
+    networks:
+      - hyperdoc-network
+
+  # AnythingLLM - Local AI Integration from GlacierEQ Arsenal
+  anything-llm:
+    image: mintplexlabs/anythingllm:master
+    environment:
+      - STORAGE_DIR=/app/storage
+      - JWT_SECRET=${JWT_SECRET}
+      - LLM_PROVIDER=generic-openai
+      - GENERIC_OPEN_AI_BASE_PATH=http://orchestrator-api:8000/ai
+      - GENERIC_OPEN_AI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - anything-llm-storage:/app/storage
+      - ./submodules/llm/anything-llm:/app/submodules/
+    ports:
+      - "3001:3001"
+    networks:
+      - hyperdoc-network
+
+  # PostgreSQL - Database Layer
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=hyperdoc_ai
+      - POSTGRES_USER=hyperdoc_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_MULTIPLE_DATABASES=onlyoffice,docspace,memory,evidence
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    command: >
+      postgres 
+      -c max_connections=1000
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+    networks:
+      - hyperdoc-network
+
+  # Redis - Caching & Session Store
+  redis:
+    image: redis/redis-stack:latest
+    environment:
+      - REDIS_ARGS=--maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+      - "8001:8001" # Redis Insight
+    networks:
+      - hyperdoc-network
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - hyperdoc-network
+
+  # Grafana - Monitoring Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards
+      - ./infra/monitoring/grafana-datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - hyperdoc-network
+
+  # Nginx - Load Balancer & Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infra/nginx/ssl:/etc/nginx/ssl
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - orchestrator-api
+      - onlyoffice-documentserver
+      - docspace-ai
+    networks:
+      - hyperdoc-network
+
+volumes:
+  document-data:
+    driver: local
+  document-logs:
+    driver: local
+  docspace-data:
+    driver: local
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  anything-llm-storage:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  hyperdoc-network:
+    driver: bridge
+    name: hyperdoc-ai-network

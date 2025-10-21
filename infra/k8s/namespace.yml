@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hyperdoc-ai
+  labels:
+    name: hyperdoc-ai
+    app: hyperdoc-ai-powerhouse
+    foundation: glaciereq
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hyperdoc-ai-staging
+  labels:
+    name: hyperdoc-ai-staging
+    app: hyperdoc-ai-powerhouse
+    environment: staging
